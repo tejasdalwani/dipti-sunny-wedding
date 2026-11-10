@@ -111,9 +111,11 @@ function App() {
   const [rsvpOpen, setRsvpOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
-    const [musicOn, setMusicOn] = useState(false);
+  const [musicOn, setMusicOn] = useState(false);
   const [musicNeedsTap, setMusicNeedsTap] = useState(false);
   const musicRef = useRef(null);
+  const [entered, setEntered] = useState(false); // New state for the welcome screen
+  const [isOpening, setIsOpening] = useState(false);
 
   // Background music.
   // 1. Try to autoplay on load.
@@ -210,18 +212,45 @@ function App() {
     return () => observer.disconnect();
   }, []);
 
+  
+async function enterSite() {
+  if (isOpening || entered) return;
+
+  setIsOpening(true);
+
+  const audio = musicRef.current;
+  if (audio && audio.paused) {
+    try {
+      await audio.play();
+    } catch (error) {
+      console.warn('Audio play failed:', error);
+    }
+  }
+
+  // Allow the opening animation to finish before revealing the website.
+  window.setTimeout(() => {
+    setEntered(true);
+  }, 1100);
+}
+
+
   async function toggleMusic() {
     const audio = musicRef.current;
     if (!audio) return;
+
     if (!audio.paused) {
-      audio.pause(); // the 'pause' event updates the button
+      audio.pause();
       return;
     }
+
     try {
-      await audio.play(); // the 'playing' event updates the button
+      await audio.play();
     } catch (error) {
-      if (error.name === 'NotAllowedError') setMusicNeedsTap(true);
-      else if (error.name !== 'AbortError') console.warn('Wedding music could not be played:', error, audio.src);
+      if (error.name === 'NotAllowedError') {
+        setMusicNeedsTap(true);
+      } else {
+        console.warn('Wedding music could not be played:', error);
+      }
     }
   }
 
@@ -231,6 +260,17 @@ function App() {
   ];
 
   return <div className="site-shell">
+    {!entered && (
+      <div
+  className={`welcome-overlay ${isOpening ? 'is-opening' : ''}`}
+  onClick={enterSite}
+>
+        <div className="welcome-content">
+          <div className="hero-monogram">D<span>/</span>S</div>
+          <p>Tap anywhere to open</p>
+        </div>
+      </div>
+    )}
     <div className="topline"><span>॥ जय झूलेलाल ॥</span><span>॥ श्री गणेशाय नमः ॥</span></div>
     <header className="site-header">
       <a className="brand" href="#home" aria-label="Dipti and Sunny home"><span className="brand-mark">D<span>/</span>S</span><span className="brand-caption">A WEDDING CELEBRATION</span></a>
