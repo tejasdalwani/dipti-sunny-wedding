@@ -128,7 +128,7 @@ function App() {
 
     // touchstart is deliberately NOT listed: browsers don't treat it as a
     // user gesture, so play() would be rejected again.
-    const RETRY_EVENTS = ['pointerup', 'touchend', 'click', 'keydown'];
+    const RETRY_EVENTS = ['pointerup', 'touchend', 'click', 'keydown', 'scroll', 'wheel', 'touchmove'];
     let attempting = false;
     let waiting = false;
 
