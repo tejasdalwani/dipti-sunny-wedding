@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const WEDDING_DATE = new Date('2026-11-25T14:00:00+05:30');
 const MAP_URL = 'https://www.google.com/maps/search/?api=1&query=Tulips+Lawns+%26+Resort+Dhapewada+Nagpur';
+const LOOP_MUSIC = true;
 
 function Ornament({ className = '' }) {
   return <div className={`ornament ${className}`} aria-hidden="true"><span>✦</span><i>❧</i><span>✦</span></div>;
@@ -110,19 +111,80 @@ function App() {
   const [rsvpOpen, setRsvpOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
-  const [musicOn, setMusicOn] = useState(false);
+    const [musicOn, setMusicOn] = useState(false);
   const [musicNeedsTap, setMusicNeedsTap] = useState(false);
   const musicRef = useRef(null);
 
-  // Try audible autoplay on arrival. Most browsers require a user gesture,
-  // so show a one-tap fallback when autoplay is blocked.
+  // Background music.
+  // 1. Try to autoplay on load.
+  // 2. If the browser blocks it, retry on the visitor's first real interaction.
+  // 3. React state mirrors the audio element's real events, so the button
+  //    label can never drift out of sync with what is actually playing.
   useEffect(() => {
     const audio = musicRef.current;
     if (!audio) return;
+
     audio.volume = 0.55;
-    audio.play()
-      .then(() => { setMusicOn(true); setMusicNeedsTap(false); })
-      .catch(() => { setMusicOn(false); setMusicNeedsTap(true); });
+
+    // touchstart is deliberately NOT listed: browsers don't treat it as a
+    // user gesture, so play() would be rejected again.
+    const RETRY_EVENTS = ['pointerup', 'touchend', 'click', 'keydown'];
+    let attempting = false;
+    let waiting = false;
+
+    const tryPlay = async () => {
+      if (attempting || !audio.paused) return;
+      attempting = true;
+      try {
+        await audio.play();
+      } catch (error) {
+        if (error.name === 'NotAllowedError') {
+          setMusicNeedsTap(true); // autoplay blocked: wait for a gesture
+        } else if (error.name !== 'AbortError') {
+          console.warn('Wedding music could not be played:', error, audio.src);
+        }
+      } finally {
+        attempting = false;
+      }
+    };
+
+    const onInteraction = (event) => {
+      // The music button handles its own clicks via toggleMusic.
+      if (event.target instanceof Element && event.target.closest('.music-toggle')) return;
+      tryPlay();
+    };
+
+    const stopWaitingForInteraction = () => {
+      if (!waiting) return;
+      waiting = false;
+      RETRY_EVENTS.forEach((type) => document.removeEventListener(type, onInteraction, true));
+    };
+
+    // Music is really playing: sync UI and stop listening for retries.
+    // Because the listeners are gone after this, pausing never restarts it,
+    // and a finished track is never restarted automatically.
+    const handlePlaying = () => {
+      setMusicOn(true);
+      setMusicNeedsTap(false);
+      stopWaitingForInteraction();
+    };
+    const handleStopped = () => setMusicOn(false);
+
+    audio.addEventListener('playing', handlePlaying);
+    audio.addEventListener('pause', handleStopped);
+    audio.addEventListener('ended', handleStopped);
+
+    RETRY_EVENTS.forEach((type) => document.addEventListener(type, onInteraction, true));
+    waiting = true;
+
+    tryPlay(); // autoplay attempt on page load
+
+    return () => {
+      stopWaitingForInteraction();
+      audio.removeEventListener('playing', handlePlaying);
+      audio.removeEventListener('pause', handleStopped);
+      audio.removeEventListener('ended', handleStopped);
+    };
   }, []);
 
   // Fade sections and cards in as visitors scroll down the invitation.
@@ -151,17 +213,15 @@ function App() {
   async function toggleMusic() {
     const audio = musicRef.current;
     if (!audio) return;
-    if (musicOn) {
-      audio.pause();
-      setMusicOn(false);
+    if (!audio.paused) {
+      audio.pause(); // the 'pause' event updates the button
       return;
     }
     try {
-      await audio.play();
-      setMusicOn(true);
-      setMusicNeedsTap(false);
-    } catch {
-      setMusicNeedsTap(true);
+      await audio.play(); // the 'playing' event updates the button
+    } catch (error) {
+      if (error.name === 'NotAllowedError') setMusicNeedsTap(true);
+      else if (error.name !== 'AbortError') console.warn('Wedding music could not be played:', error, audio.src);
     }
   }
 
@@ -223,7 +283,7 @@ function App() {
           <div className="photo-frame couple-frame">
             <img
               className="couple-photo"
-              src="/assets/couple.jpeg"
+              src={`${import.meta.env.BASE_URL}assets/couple.jpeg`}
               alt="Dipti and Sunny"
               loading="lazy"
             />
@@ -298,7 +358,7 @@ function App() {
             <p className="quote-credit">— Aapki chhoti si Raavya</p>
             <img
               className="raavya-photo"
-              src="/assets/raavya.jpeg"
+              src={`${import.meta.env.BASE_URL}assets/raavya.jpeg`}
               alt="Raavya"
               loading="lazy"
             />
@@ -306,7 +366,7 @@ function App() {
         </div>
         <div className="noddy-card">
           <div className="noddy-photo">
-            <img src="/assets/noddy.jpeg" alt="Noddy" loading="lazy" />
+            <img src={`${import.meta.env.BASE_URL}assets/noddy.jpeg`} alt="Noddy" loading="lazy" />
           </div>
           <div><p className="eyebrow">A place forever in our hearts</p><h3>The paws that walked beside us</h3><p className="noddy-line">Will forever remain in our hearts.</p><span className="quote-credit">— Noddy</span></div>
         </div>
@@ -331,7 +391,7 @@ function App() {
         <div className="finale-inner"><div className="hero-monogram">D<span>/</span>S</div><Ornament/>
           <p className="script-kicker">With love and gratitude</p><h2>We look forward<br/>to celebrating with you.</h2>
           <p>Your presence with your family will be our pride and joy.</p>
-          <div className="finale-actions"><button className="button button-primary" onClick={() => setRsvpOpen(true)}>Kindly RSVP</button><a className="button button-outline" href="#home">Back to top ↑</a></div>
+          <div className="finale-actions"><button className="button button-primary" onClick={() => setRsvpOpen(true)}>Send your wishes</button><a className="button button-outline" href="#home">Back to top ↑</a></div>
           <small>Dipti & Sunny · 25 November 2026</small>
         </div>
       </section>
@@ -339,16 +399,21 @@ function App() {
 
     <footer className="site-footer"><span>Made with love for Dipti & Sunny</span><span>॥ जय झूलेलाल ॥</span></footer>
 
-    <audio ref={musicRef} src="/assets/music.mp3" loop preload="auto" autoPlay />
+        <audio
+      ref={musicRef}
+      src={`${import.meta.env.BASE_URL}assets/music.mp3`}
+      loop={LOOP_MUSIC}
+      preload="auto"
+    />
     <button
-      className="music-toggle"
-      onClick={toggleMusic}
-      aria-label={musicOn ? 'Pause wedding music' : 'Play wedding music'}
-      aria-pressed={musicOn}
-      title={musicOn ? 'Turn wedding music off' : 'Turn wedding music on'}
-    >
-      {musicOn ? '♫ Pause music' : musicNeedsTap ? '♫ Play music' : '♫ Music off'}
-    </button>
+  className="music-toggle"
+  onClick={toggleMusic}
+  aria-label={musicOn ? 'Pause wedding music' : 'Play wedding music'}
+  aria-pressed={musicOn}
+  title={musicOn ? 'Turn wedding music off' : 'Turn wedding music on'}
+>
+  {musicOn ? '♫ Pause music' : musicNeedsTap ? '♫ Play music' : '♫ Music off'}
+</button>
 
     {videoOpen && <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && setVideoOpen(false)}>
       <div className="video-modal"><button className="modal-close" onClick={() => setVideoOpen(false)}>×</button>
