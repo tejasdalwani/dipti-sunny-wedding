@@ -116,6 +116,7 @@ function App() {
   const musicRef = useRef(null);
   const [entered, setEntered] = useState(false); // New state for the welcome screen
   const [isOpening, setIsOpening] = useState(false);
+  const [resumeMusicAfterVideo, setResumeMusicAfterVideo] = useState(false);
 
   // Background music.
   // 1. Try to autoplay on load.
@@ -133,6 +134,7 @@ function App() {
     const RETRY_EVENTS = ['pointerup', 'touchend', 'click', 'keydown', 'scroll', 'wheel', 'touchmove'];
     let attempting = false;
     let waiting = false;
+    
 
     const tryPlay = async () => {
       if (attempting || !audio.paused) return;
@@ -188,6 +190,24 @@ function App() {
       audio.removeEventListener('ended', handleStopped);
     };
   }, []);
+
+  useEffect(() => {
+  if (videoOpen || !resumeMusicAfterVideo) return;
+
+  const audio = musicRef.current;
+  if (!audio) return;
+
+  audio.play()
+    .then(() => {
+      setMusicOn(true);
+      setMusicNeedsTap(false);
+      setResumeMusicAfterVideo(false);
+    })
+    .catch((error) => {
+      console.warn("Could not resume background music:", error);
+      setMusicNeedsTap(true);
+    });
+}, [videoOpen, resumeMusicAfterVideo]);
 
   // Fade sections and cards in as visitors scroll down the invitation.
   useEffect(() => {
@@ -294,15 +314,30 @@ async function enterSite() {
           <p className="hero-date">Wednesday · 25th November 2026</p>
           <p className="hero-place">Nagpur, Maharashtra</p>
           <div className="hero-actions">
-            <a className="button button-primary" href="#invitation">Explore Invitation <span>↓</span></a>
-            <button className="button button-outline" onClick={() => setVideoOpen(true)}>▶ Watch Invitation</button>
-          </div>
+  <button
+    className="button button-primary"
+    onClick={() => setVideoOpen(true)}
+  >
+    ▶ Watch Invitation Video
+  </button>
+</div>
+
+<a
+  className="scroll-cue"
+  href="#countdown"
+  aria-label="Scroll to see more"
+>
+  <span>Scroll to see more</span>
+  <span className="scroll-cue-icon" aria-hidden="true">
+    <i />
+  </span>
+</a>
           <div className="hero-bottom-note">Your presence is our blessing</div>
         </div>
         <div className="hero-side-note">A DAY TO CHERISH · A LIFETIME TOGETHER</div>
       </section>
 
-      <section className="countdown-section">
+      <section className="countdown-section" id="countdown">
         <p className="eyebrow">The celebration begins in</p>
         <div className="countdown-date-highlight">
           <span className="date-label">SAVE THE DATE</span>
@@ -455,11 +490,46 @@ async function enterSite() {
   {musicOn ? '♫ Pause music' : musicNeedsTap ? '♫ Play music' : '♫ Music off'}
 </button>
 
-    {videoOpen && <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && setVideoOpen(false)}>
-      <div className="video-modal"><button className="modal-close" onClick={() => setVideoOpen(false)}>×</button>
-        <div className="video-placeholder"><span>▶</span><h3>Your wedding film</h3><p>Add the finished Google Vids export as <code>public/assets/wedding-video.mp4</code>.</p></div>
-      </div>
-    </div>}
+{videoOpen && (
+  <div
+    className="modal-backdrop video-backdrop"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) {
+        setVideoOpen(false);
+      }
+    }}
+  >
+    <div className="video-modal">
+      <button
+        className="modal-close"
+        onClick={() => setVideoOpen(false)}
+        aria-label="Close video"
+      >
+        ×
+      </button>
+
+      <video
+        className="wedding-video-player"
+        src={`${import.meta.env.BASE_URL}assets/wedding-video.mp4`}
+        controls
+        autoPlay
+        playsInline
+        preload="metadata"
+        onPlay={() => {
+          const backgroundMusic = musicRef.current;
+
+          if (backgroundMusic && !backgroundMusic.paused) {
+            setResumeMusicAfterVideo(true);
+            backgroundMusic.pause();
+            setMusicOn(false);
+          }
+        }}
+      >
+        Your browser does not support video playback.
+      </video>
+    </div>
+  </div>
+)}
     {rsvpOpen && <RSVPModal onClose={() => setRsvpOpen(false)} />}
   </div>;
 }
