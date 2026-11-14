@@ -442,7 +442,7 @@ function enterSite() {
         <div className="paper-card">
           <div className="paper-flower paper-flower-a">❀</div><div className="paper-flower paper-flower-b">✿</div>
           <p className="eyebrow">Your presence is our blessing</p>
-          <h2 className="script-heading">A heartfelt invitation</h2>
+          <h2 className="script-heading">A Heartfelt Invitation</h2>
           <Ornament />
           <p className="invitation-text">With the divine blessings of God, in loving memories of</p>
           <p className="memorial-names">Late Shri Lalchand Dalwani<br/>and Late Shri Dr. Anand Dalwani</p>
