@@ -114,9 +114,60 @@ function App() {
   const [musicOn, setMusicOn] = useState(false);
   const [musicNeedsTap, setMusicNeedsTap] = useState(false);
   const musicRef = useRef(null);
+  const openingStartedRef = useRef(false);
+  const openingTimerRef = useRef(null);
   const [entered, setEntered] = useState(false); // New state for the welcome screen
   const [isOpening, setIsOpening] = useState(false);
   const [resumeMusicAfterVideo, setResumeMusicAfterVideo] = useState(false);
+
+  // Lock the page behind the welcome screen.
+useEffect(() => {
+  if (entered) return;
+
+  const html = document.documentElement;
+  const body = document.body;
+  const scrollY = window.scrollY;
+
+  const previousStyles = {
+    htmlOverflow: html.style.overflow,
+    bodyPosition: body.style.position,
+    bodyTop: body.style.top,
+    bodyWidth: body.style.width,
+    bodyOverflow: body.style.overflow,
+  };
+
+  const preventScroll = (event) => {
+    event.preventDefault();
+  };
+
+  html.style.overflow = 'hidden';
+  body.style.position = 'fixed';
+  body.style.top = `-${scrollY}px`;
+  body.style.width = '100%';
+  body.style.overflow = 'hidden';
+
+  document.addEventListener('touchmove', preventScroll, {
+    passive: false,
+  });
+
+  document.addEventListener('wheel', preventScroll, {
+    passive: false,
+  });
+
+  return () => {
+    html.style.overflow = previousStyles.htmlOverflow;
+    body.style.position = previousStyles.bodyPosition;
+    body.style.top = previousStyles.bodyTop;
+    body.style.width = previousStyles.bodyWidth;
+    body.style.overflow = previousStyles.bodyOverflow;
+
+    document.removeEventListener('touchmove', preventScroll);
+    document.removeEventListener('wheel', preventScroll);
+
+    // Always open the invitation from the beginning.
+    window.scrollTo(0, 0);
+  };
+}, [entered]);
 
   // Background music.
   // 1. Try to autoplay on load.
@@ -233,24 +284,27 @@ function App() {
   }, []);
 
   
-async function enterSite() {
-  if (isOpening || entered) return;
+function enterSite() {
+  if (openingStartedRef.current || entered) return;
 
+  openingStartedRef.current = true;
   setIsOpening(true);
 
+  // Start music directly from the user's tap.
+  // Do not wait for the audio promise to finish.
   const audio = musicRef.current;
+
   if (audio && audio.paused) {
-    try {
-      await audio.play();
-    } catch (error) {
+    audio.play().catch((error) => {
       console.warn('Audio play failed:', error);
-    }
+      setMusicNeedsTap(true);
+    });
   }
 
-  // Allow the opening animation to finish before revealing the website.
-  window.setTimeout(() => {
+  // Let the opening animation finish.
+  openingTimerRef.current = window.setTimeout(() => {
     setEntered(true);
-  }, 1100);
+  }, 1000);
 }
 
 
@@ -281,16 +335,27 @@ async function enterSite() {
 
   return <div className="site-shell">
     {!entered && (
-      <div
-  className={`welcome-overlay ${isOpening ? 'is-opening' : ''}`}
-  onClick={enterSite}
->
-        <div className="welcome-content">
-          <div className="hero-monogram">D<span>/</span>S</div>
-          <p>Tap anywhere to open</p>
-        </div>
+  <div
+    className={`welcome-overlay ${isOpening ? 'is-opening' : ''}`}
+    onClick={enterSite}
+    role="button"
+    tabIndex={0}
+    aria-label="Tap to open the wedding invitation"
+    onKeyDown={(event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        enterSite();
+      }
+    }}
+  >
+    <div className="welcome-content">
+      <div className="hero-monogram">
+        D<span>/</span>S
       </div>
-    )}
+      <p>Tap anywhere to open</p>
+    </div>
+  </div>
+)}
     <div className="topline"><span>॥ जय झूलेलाल ॥</span><span>॥ श्री गणेशाय नमः ॥</span></div>
     <header className="site-header">
       <a className="brand" href="#home" aria-label="Dipti and Sunny home"><span className="brand-mark">D<span>/</span>S</span><span className="brand-caption">A WEDDING CELEBRATION</span></a>
@@ -421,14 +486,14 @@ async function enterSite() {
               <li>Deepak & Vidya Dalwani</li>
               <li>Harish & Shraddha Dalwani</li>
               <li>Kamal & Roshani Mukhi</li>
-              <li>Pravesh & Jiya Parvani</li>
+              <li>Pravesh & Jiya Paryani</li>
               <li>Shubham & Jiya Dalwani</li>
               <li>and family</li>
             </ul>
           </div>
           <div className="family-card welcome-card">
             <span className="family-icon">♡</span><h3>A Warm Welcome From</h3>
-            <p className="family-names">Tejas, Mahek, Mohit & Raavya</p>
+            <p className="family-names">Tejas, Mahek, Preet, Bhumik, Mohit & Raavya</p>
             <div className="raavya-quote">“Meri Masi ki shaadi mein jarur jarur aanaaa!”</div>
             <p className="quote-credit">— Aapki chhoti si Raavya</p>
             <img
